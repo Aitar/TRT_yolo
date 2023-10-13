@@ -9,8 +9,8 @@ if(CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
 endif(CCACHE_FOUND)
 
-set(CUDNN_INCLUDE_DIR /nfs/volume-73-1/huangdingli/my_workspace/cuda/cudnn/include)
-set(CUDNN_LIBRARY /nfs/volume-73-1/huangdingli/my_workspace/cuda/cudnn/lib)
+set(CUDNN_INCLUDE_DIR )
+set(CUDNN_LIBRARY )
 
 set(CUDA_INCLUDE /usr/local/cuda-11.3/include)
 set(CUDA_LIB /usr/local/cuda-11.3/lib64)
@@ -18,8 +18,8 @@ set(CUDA_LIB /usr/local/cuda-11.3/lib64)
 set(CV_DIR /opt/miniconda3/envs/clibs/include/opencv4)
 set(CV_LIB /opt/miniconda3/envs/clibs/lib)
 
-set(TRT_INCLUDE /nfs/volume-73-1/huangdingli/lib/TensorRT-8.4.1.5/include)
-set(TRT_LIB /nfs/volume-73-1/huangdingli/lib/TensorRT-8.4.1.5/lib)
+set(TRT_INCLUDE )
+set(TRT_LIB )
 
 include_directories(${CV_DIR})
 link_directories(${CV_LIB})
