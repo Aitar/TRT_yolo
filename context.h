@@ -84,7 +84,8 @@ namespace TRT {
             parser->parseFromFile(src.c_str(), 1);
             builder->setMaxBatchSize(maxBatchSize);
             config->setMaxWorkspaceSize(maxWorkspaceSize);
-
+            config->setFlag(nvinfer1::BuilderFlag::kFP16);
+            
             // set profile
             auto profile = builder->createOptimizationProfile();
             checkNullptr(profile, "profile");
