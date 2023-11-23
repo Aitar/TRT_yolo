@@ -1,13 +1,5 @@
-//
-// Created by Aitar on 2022/7/17.
-//
-
-#ifndef YOLO_CONTEXT_H
-#define YOLO_CONTEXT_H
-
 #include <NvOnnxParser.h>
 #include "utils.h"
-
 
 namespace TRT {
     using namespace nvinfer1;
@@ -19,7 +11,7 @@ namespace TRT {
 
         EngineContext() = default;
 
-        EngineContext(const string& src, cudaStream_t stream) {
+        EngineContext(const string& src) {
             auto engineData = loadFile(src);
             if (engineData.empty()) {
                 cout << "Read empty file, check path." << endl;
@@ -30,10 +22,9 @@ namespace TRT {
             checkNullptr(engine_.get(), "engine");
             exeCtx_ = nvshared(engine_->createExecutionContext());
             checkNullptr(exeCtx_.get(), "exeCtx");
-            setStream(stream);
         }
 
-        EngineContext(const string& src, const string& dst, int maxBatchSize, const size_t maxWorkspaceSize, cudaStream_t stream) {
+        EngineContext(const string& src, const string& dst, int maxBatchSize, const size_t maxWorkspaceSize) {
             if (!compile(src, dst, maxBatchSize, maxWorkspaceSize)) {
                 printf("Compile ONNX file failed, exit.\n");
                 return;
@@ -41,26 +32,12 @@ namespace TRT {
             checkNullptr(engine_.get(), "engine");
             exeCtx_ = nvshared(engine_->createExecutionContext());
             checkNullptr(exeCtx_.get(), "exeCtx");
-            setStream(stream);
         }
 
-        void setStream(cudaStream_t stream) {
-            if (streamOwner_) {
-                if (stream_)
-                    cudaStreamDestroy(stream_);
-                streamOwner_ = false;
-            }
-            stream_ = stream;
-        }
 
         bool createContext(const void* engineData, size_t size) {
             if (engineData == nullptr || size == 0) return false;
             destroy();
-
-            CUDACHEK(cudaStreamCreate(&stream_));
-            streamOwner_ = true;
-            if (stream_ == nullptr)
-                return false;
 
             runtime_ = nvshared(createInferRuntime(logger));
             if (runtime_ == nullptr) return false;
@@ -112,18 +89,11 @@ namespace TRT {
             exeCtx_.reset();
             engine_.reset();
             runtime_.reset();
-            if (streamOwner_ && stream_)
-                cudaStreamDestroy(stream_);
-            stream_ = nullptr;
         }
 
     public:
-        cudaStream_t stream_ = nullptr;
-        bool streamOwner_ = false;
         shared_ptr <IRuntime> runtime_ = nullptr;
         shared_ptr <ICudaEngine> engine_ = nullptr;
         shared_ptr <IExecutionContext> exeCtx_ = nullptr;
     };
 }
-
-#endif //YOLO_CONTEXT_H

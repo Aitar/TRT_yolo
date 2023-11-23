@@ -36,20 +36,26 @@ private:
     std::chrono::time_point<std::chrono::high_resolution_clock> start_;
 };
 
-struct Size{
-    int width = 0, height = 0;
-
-    Size() = default;
-    Size(int h, int w)
-            :width(h), height(w){}
-};
-
 struct AffineMatrix{
 
     float i2d[6];       // image to dst(network), 2x3 matrix
     float d2i[6];       // dst to image, 2x3 matrix
     float* i2dGPU;
     float* d2iGPU;
+
+    AffineMatrix(const float hi, const float wi, const float ho, const float wo) {
+        float scale = std::min(wo / wi, ho / wo);
+
+        i2d[0] = scale;  i2d[1] = 0;  i2d[2] = -scale * wi  * 0.5  + wo * 0.5 + scale * 0.5 - 0.5;
+
+        i2d[3] = 0;  i2d[4] = scale;  i2d[5] = -scale * hi * 0.5 + ho * 0.5 + scale * 0.5 - 0.5;
+
+        invertAffineTransform(i2d, d2i);
+        CUDACHEK(cudaMalloc(&d2iGPU, sizeof(float) * 6));
+        CUDACHEK(cudaMalloc(&i2dGPU, sizeof(float) * 6));
+        CUDACHEK(cudaMemcpy(d2iGPU, &d2i[0], sizeof(float) * 6, cudaMemcpyHostToDevice));
+        CUDACHEK(cudaMemcpy(i2dGPU, &i2d[0], sizeof(float) * 6, cudaMemcpyHostToDevice));
+    }
 
     void invertAffineTransform(float imat[6], float omat[6]){
         float i00 = imat[0];  float i01 = imat[1];  float i02 = imat[2];
@@ -64,29 +70,19 @@ struct AffineMatrix{
         float A21 = -i10 * D;
         float b1 = -A11 * i02 - A12 * i12;
         float b2 = -A21 * i02 - A22 * i12;
-        omat[0] = A11;  omat[1] = A12;  omat[2] = b1;
-        omat[3] = A21;  omat[4] = A22;  omat[5] = b2;
-    }
 
-    void compute(const Size& from, const Size& to){
-        float scale = std::min(to.width / (float)from.width, to.height / (float)from.height);
-
-        i2d[0] = scale;  i2d[1] = 0;  i2d[2] = -scale * from.width  * 0.5  + to.width * 0.5 + scale * 0.5 - 0.5;
-
-        i2d[3] = 0;  i2d[4] = scale;  i2d[5] = -scale * from.height * 0.5 + to.height * 0.5 + scale * 0.5 - 0.5;
-
-        invertAffineTransform(i2d, d2i);
-        CUDACHEK(cudaMalloc(&d2iGPU, sizeof(float) * 6));
-        CUDACHEK(cudaMalloc(&i2dGPU, sizeof(float) * 6));
-        CUDACHEK(cudaMemcpy(d2iGPU, &d2i[0], sizeof(float) * 6, cudaMemcpyHostToDevice));
-        CUDACHEK(cudaMemcpy(i2dGPU, &i2d[0], sizeof(float) * 6, cudaMemcpyHostToDevice));
-
+        omat[0] = A11;
+        omat[1] = A12;
+        omat[2] = b1;
+        omat[3] = A21;
+        omat[4] = A22;
+        omat[5] = b2;
     }
 };
 
 class CudaManger{
 public:
-    CudaManger(int size, int memSize, cudaStream_t& outStream) {
+    CudaManger(int size, int memSize) {
         memSize_ = memSize;
         for (int i = 0; i < size; ++i) {
 //            void* memPtr;
@@ -94,7 +90,6 @@ public:
             auto stream = std::make_shared<cudaStream_t>();
             cudaStreamCreate(stream.get());
             streams_.emplace(stream);
-            CUDACHEK(cudaStreamSynchronize(outStream));
 //            mems_.emplace(memPtr);
         }
     }
@@ -126,7 +121,7 @@ public:
         mems_.emplace(mem);
     }
 
-    void returnStream(std::shared_ptr<cudaStream_t>& stream) {
+    void returnStream(const std::shared_ptr<cudaStream_t> stream) {
         streams_.emplace(stream);
     }
 
