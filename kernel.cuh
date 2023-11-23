@@ -151,8 +151,8 @@ __global__ void nmsCuda(float* boxes,
                         const int boxNum,
                         const float* confidences) {
 
-    float confidence = confidences[blockIdx.x];
-    if (confidence < confThreshold) {
+    float curConfidence = confidences[blockIdx.x];
+    if (curConfidence < confThreshold) {
         if (threadIdx.x == 0)
             keep[blockIdx.x] = false;
         return;
@@ -161,6 +161,7 @@ __global__ void nmsCuda(float* boxes,
     const uint ofs = blockIdx.x << 2;
     float curBox[4];
     float box[2][4];
+    float confidence;
 
     __shared__ bool isKeepShared[256];
     bool isKeep[2] = {true};
@@ -168,11 +169,14 @@ __global__ void nmsCuda(float* boxes,
 
 #pragma unroll
     for (uint i = threadIdx.x; i < boxNum; i += blockDim.x) {
+        confidence = confidences[i];
+        if (confidence > confThreshold) {
 #pragma unroll
-        for (int j = 0; j < 4; ++j)
-            box[i & 1][j] = boxes[(i << 2) + j];
-        if (i != blockIdx.x && calIOU(curBox, box[i & 1]) >= nmsThreshold)
-            isKeep[i & 1] &= confidence > confidences[i];
+            for (int j = 0; j < 4; ++j)
+                box[i & 1][j] = boxes[(i << 2) + j];
+            if (i != blockIdx.x && calIOU(curBox, box[i & 1]) > nmsThreshold)
+                isKeep[i & 1] &= curConfidence > confidence;
+        }
     }
 
     isKeepShared[threadIdx.x] = isKeep[0] && isKeep[1];
